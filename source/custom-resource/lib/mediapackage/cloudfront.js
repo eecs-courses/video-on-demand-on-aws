@@ -11,94 +11,123 @@
  *  and limitations under the License.                                                                                *
  *********************************************************************************************************************/
 
-const AWS = require('aws-sdk');
-const originId = 'vodMPOrigin';
+const AWS = require("aws-sdk");
+const originId = "vodMPOrigin";
 
 module.exports.addCustomOrigin = async (distributionId, domainName) => {
-    if (!distributionId) {
-        throw new Error('distributionId must be informed');
-    }
+  if (!distributionId) {
+    throw new Error("distributionId must be informed");
+  }
 
-    if (!domainName) {
-        throw new Error('domainName must be informed');
-    }
+  if (!domainName) {
+    throw new Error("domainName must be informed");
+  }
 
-    const cloudFront = new AWS.CloudFront();
-    const response = await cloudFront.getDistributionConfig({ Id: distributionId }).promise();
-    const config = response.DistributionConfig;
+  const cloudFront = new AWS.CloudFront();
+  const response = await cloudFront
+    .getDistributionConfig({ Id: distributionId })
+    .promise();
+  const config = response.DistributionConfig;
 
-    const originExists = config.Origins.Items.some(item => item.Id === originId);
-    if (originExists) {
-        console.log(`Origin ${originId} has already been added to distribution ${distributionId}`);
-        return;
-    }
+  const originExists = config.Origins.Items.some(
+    (item) => item.Id === originId
+  );
+  if (originExists) {
+    console.log(
+      `Origin ${originId} has already been added to distribution ${distributionId}`
+    );
+    return;
+  }
 
-    console.log(`Adding MediaPackage as origin to distribution ${distributionId}`);
-    const url = new URL(domainName);
+  console.log(
+    `Adding MediaPackage as origin to distribution ${distributionId}`
+  );
+  const url = new URL(domainName);
 
-    const customOrigin = {
-        Id: originId,
-        DomainName: url.hostname,
-        OriginPath: '',
-        CustomHeaders: { Quantity: 0 },
-        CustomOriginConfig: {
-            HTTPPort: 80,
-            HTTPSPort: url.port || 443,
-            OriginProtocolPolicy: 'https-only',
-            OriginSslProtocols: { Quantity: 1, Items: ['TLSv1.2'] },
-            OriginReadTimeout: 30,
-            OriginKeepaliveTimeout: 5
-        }
+  const customOrigin = {
+    Id: originId,
+    DomainName: url.hostname,
+    OriginPath: "",
+    CustomHeaders: { Quantity: 0 },
+    CustomOriginConfig: {
+      HTTPPort: 80,
+      HTTPSPort: url.port || 443,
+      OriginProtocolPolicy: "https-only",
+      OriginSslProtocols: { Quantity: 1, Items: ["TLSv1.2"] },
+      OriginReadTimeout: 30,
+      OriginKeepaliveTimeout: 5,
+    },
+  };
+
+  config.Origins.Quantity = config.Origins.Items.push(customOrigin);
+
+  const customBehavior = {
+    PathPattern: "out/*",
+    TargetOriginId: originId,
+    ForwardedValues: {
+      QueryString: false,
+      Cookies: { Forward: "none" },
+      Headers: { Quantity: 0 },
+      QueryStringCacheKeys: { Quantity: 0 },
+    },
+    TrustedSigners: { Enabled: false, Quantity: 0 },
+    ViewerProtocolPolicy: "redirect-to-https",
+    MinTTL: 0,
+    AllowedMethods: {
+      Quantity: 3,
+      Items: ["HEAD", "GET", "OPTIONS"],
+      CachedMethods: { Quantity: 2, Items: ["HEAD", "GET"] },
+    },
+    ForwardedValues: {
+      Cookies: {
+        Forward: "none",
+      },
+      QueryString: false,
+      Headers: {
+        Quantity: 4,
+        Items: [
+          "Access-Control-Allow-Origin",
+          "Access-Control-Request-Headers",
+          "Access-Control-Request-Method",
+          "Origin",
+        ],
+      },
+    },
+    SmoothStreaming: false,
+    DefaultTTL: 86400,
+    MaxTTL: 31536000,
+    Compress: false,
+    LambdaFunctionAssociations: { Quantity: 0 },
+    FieldLevelEncryptionId: "",
+  };
+
+  if (config.CacheBehaviors.Items) {
+    config.CacheBehaviors.Items.push(customBehavior);
+  } else {
+    config.CacheBehaviors.Items = [customBehavior];
+  }
+
+  config.CacheBehaviors.Quantity = config.CacheBehaviors.Items.length;
+
+  try {
+    const params = {
+      Id: distributionId,
+      DistributionConfig: config,
+      IfMatch: response.ETag,
     };
 
-    config.Origins.Quantity = config.Origins.Items.push(customOrigin);
-
-    const customBehavior = {
-        PathPattern: 'out/*',
-        TargetOriginId: originId,
-        ForwardedValues: {
-            QueryString: false,
-            Cookies: { Forward: 'none' },
-            Headers: { Quantity: 0 },
-            QueryStringCacheKeys: { Quantity: 0 }
-        },
-        TrustedSigners: { Enabled: false, Quantity: 0 },
-        ViewerProtocolPolicy: 'redirect-to-https',
-        MinTTL: 0,
-        AllowedMethods: {
-            Quantity: 2,
-            Items: ['HEAD', 'GET'],
-            CachedMethods: { Quantity: 2, Items: ['HEAD', 'GET'] }
-        },
-        SmoothStreaming: false,
-        DefaultTTL: 86400,
-        MaxTTL: 31536000,
-        Compress: false,
-        LambdaFunctionAssociations: { Quantity: 0 },
-        FieldLevelEncryptionId: ''
-    };
-
-    if (config.CacheBehaviors.Items) {
-        config.CacheBehaviors.Items.push(customBehavior);
-    } else {
-        config.CacheBehaviors.Items = [customBehavior];
+    await cloudFront.updateDistribution(params).promise();
+    console.log(`Origins:: ${JSON.stringify(config.Origins.Items, null, 2)}`);
+    console.log(
+      `Cache behaviors:: ${JSON.stringify(
+        config.CacheBehaviors.Items,
+        null,
+        2
+      )}`
+    );
+  } catch (error) {
+    if (error.code !== "PreconditionFailed") {
+      throw error;
     }
-
-    config.CacheBehaviors.Quantity = config.CacheBehaviors.Items.length;
-
-    try {
-        const params = {
-            Id: distributionId,
-            DistributionConfig: config,
-            IfMatch: response.ETag
-        };
-
-        await cloudFront.updateDistribution(params).promise();
-        console.log(`Origins:: ${JSON.stringify(config.Origins.Items, null, 2)}`);
-        console.log(`Cache behaviors:: ${JSON.stringify(config.CacheBehaviors.Items, null, 2)}`);
-    } catch (error) {
-        if (error.code !== 'PreconditionFailed') {
-            throw error;
-        }
-    }
+  }
 };
