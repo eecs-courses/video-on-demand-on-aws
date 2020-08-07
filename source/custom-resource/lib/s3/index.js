@@ -11,117 +11,70 @@
  *  and limitations under the License.                                                                                *
  *********************************************************************************************************************/
 
-const AWS = require('aws-sdk');
+const AWS = require("aws-sdk");
 
 let PutNotification = async (config) => {
-    const s3 = new AWS.S3();
+  const s3 = new AWS.S3();
 
-    let params;
+  let params;
 
-    switch (config.WorkflowTrigger) {
-        case 'VideoFile':
-            params = {
-                Bucket: config.Source,
-                NotificationConfiguration: {
-                    LambdaFunctionConfigurations: [
-                        {
-                            Events: ['s3:ObjectCreated:*'],
-                            LambdaFunctionArn: config.IngestArn,
-                            Filter: {
-                                Key: {
-                                    FilterRules: [{
-                                        Name: 'suffix',
-                                        Value: '.mpg'
-                                    }]
-                                }
-                            }
-                        },
-                        {
-                            Events: ['s3:ObjectCreated:*'],
-                            LambdaFunctionArn: config.IngestArn,
-                            Filter: {
-                                Key: {
-                                    FilterRules: [{
-                                        Name: 'suffix',
-                                        Value: '.mp4'
-                                    }]
-                                }
-                            }
-                        },
-                        {
-                            Events: ['s3:ObjectCreated:*'],
-                            LambdaFunctionArn: config.IngestArn,
-                            Filter: {
-                                Key: {
-                                    FilterRules: [{
-                                        Name: 'suffix',
-                                        Value: '.m4v'
-                                    }]
-                                }
-                            }
-                        },
-                        {
-                            Events: ['s3:ObjectCreated:*'],
-                            LambdaFunctionArn: config.IngestArn,
-                            Filter: {
-                                Key: {
-                                    FilterRules: [{
-                                        Name: 'suffix',
-                                        Value: '.mov'
-                                    }]
-                                }
-                            }
-                        },
-                        {
-                            Events: ['s3:ObjectCreated:*'],
-                            LambdaFunctionArn: config.IngestArn,
-                            Filter: {
-                                Key: {
-                                    FilterRules: [{
-                                        Name: 'suffix',
-                                        Value: '.m2ts'
-                                    }]
-                                }
-                            }
-                        }
-                    ]
-                }
-            };
+  switch (config.WorkflowTrigger) {
+    case "VideoFile":
+      params = {
+        Bucket: config.Source,
+        NotificationConfiguration: {
+          LambdaFunctionConfigurations: [
+            {
+              Events: ["s3:ObjectCreated:*"],
+              LambdaFunctionArn: config.IngestArn,
+              Filter: {
+                Key: {
+                  FilterRules: [],
+                },
+              },
+            },
+          ],
+        },
+      };
 
-            console.log(`Configuring S3 event for ${config.WorkflowTrigger}`);
-            await s3.putBucketNotificationConfiguration(params).promise();
-            break;
+      console.log(`Configuring S3 event for ${config.WorkflowTrigger}`);
+      await s3.putBucketNotificationConfiguration(params).promise();
+      break;
 
-        case 'MetadataFile':
-            params = {
-                Bucket: config.Source,
-                NotificationConfiguration: {
-                    LambdaFunctionConfigurations: [{
-                        Events: ['s3:ObjectCreated:*'],
-                        LambdaFunctionArn: config.IngestArn,
-                        Filter: {
-                            Key: {
-                                FilterRules: [{
-                                    Name: 'suffix',
-                                    Value: 'json'
-                                }]
-                            }
-                        }
-                    }]
-                }
-            };
+    case "MetadataFile":
+      params = {
+        Bucket: config.Source,
+        NotificationConfiguration: {
+          LambdaFunctionConfigurations: [
+            {
+              Events: ["s3:ObjectCreated:*"],
+              LambdaFunctionArn: config.IngestArn,
+              Filter: {
+                Key: {
+                  FilterRules: [
+                    {
+                      Name: "suffix",
+                      Value: "json",
+                    },
+                  ],
+                },
+              },
+            },
+          ],
+        },
+      };
 
-            console.log(`Configuring S3 event for ${config.WorkflowTrigger}`);
-            await s3.putBucketNotificationConfiguration(params).promise();
-            break;
+      console.log(`Configuring S3 event for ${config.WorkflowTrigger}`);
+      await s3.putBucketNotificationConfiguration(params).promise();
+      break;
 
-        default:
-            throw new Error(`Unknown WorkflowTrigger: ${config.WorkflowTrigger}`);
-    }
+    default:
+      throw new Error(`Unknown WorkflowTrigger: ${config.WorkflowTrigger}`);
+  }
 
-    return 'success';
+  return "success";
 };
 
 module.exports = {
-    putNotification: PutNotification
+  putNotification: PutNotification,
 };
